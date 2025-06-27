@@ -49,37 +49,37 @@ const navigationItems = [
     },
     {
         name: 'Customers',
-        href: '/dashboard/customers',
+        href: '/customers',
         icon: Users,
         current: false
     },
     {
         name: 'Orders',
-        href: '/dashboard/orders',
+        href: '/orders',
         icon: ShoppingBag,
         current: false
     },
     {
         name: 'Categories',
-        href: '/dashboard/categories',
+        href: '/categories',
         icon: Tag,
         current: false
     },
     {
         name: 'Reviews',
-        href: '/dashboard/reviews',
+        href: '/reviews',
         icon: MessageSquare,
         current: false
     },
     {
         name: 'Analytics',
-        href: '/dashboard/analytics',
+        href: '/analytics',
         icon: BarChart3,
         current: false
     },
     {
         name: 'Favorites',
-        href: '/dashboard/favorites',
+        href: '/favorites',
         icon: Heart,
         current: false
     }
@@ -371,15 +371,7 @@ export default function DashboardLayout({
                             )}
 
                             {/* Add button */}
-                            <button
-                                className="flex items-center space-x-2 text-white font-medium py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                                style={{ backgroundColor: '#E213A7' }}
-                            >
-                                <Plus size={20} />
-                                <span className="hidden sm:inline">
-                                    Add New
-                                </span>
-                            </button>
+                            
                         </div>
                     </div>
                 </header>

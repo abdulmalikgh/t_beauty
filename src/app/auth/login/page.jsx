@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
-import api from '@/lib/api';
-import handleApiError from '@/lib/handleApiError';
+import api from '../../../lib/api';
+import handleApiError from '../../../lib/handleApiError';
 
 const loginAPI = {
     login: async (credentials) => {

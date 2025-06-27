@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Eye, EyeOff, X } from 'lucide-react';
 import Link from 'next/link';
-import api from '@/lib/api';
-import handleApiError from '@/lib/handleApiError';
+import api from '../../../lib/api';
+import handleApiError from '../../../lib/handleApiError';
 
 // API functions for signup
 const signupAPI = {
@@ -361,7 +361,6 @@ export default function SignUpPage() {
                                     Forgot Username?
                                 </Link>
                             </div>
-                             
                         </div>
                     </form>
                 </div>
