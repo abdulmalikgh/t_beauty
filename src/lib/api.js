@@ -53,7 +53,7 @@ api.interceptors.response.use(
                 case 401:
                     localStorage.removeItem('authToken');
                     if (typeof window !== 'undefined') {
-                        window.location.href = '/login';
+                        window.location.href = '/auth/login';
                     }
                     break;
                 case 403:
@@ -80,6 +80,5 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
 
 export default api;

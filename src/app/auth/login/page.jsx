@@ -10,9 +10,8 @@ const loginAPI = {
     login: async (credentials) => {
         try {
             const response = await api.post('/auth/login', credentials);
-
             // Store token if login successful
-            if (response.data.token) {
+            if (response.data.access_token) {
                 localStorage.setItem('authToken', response.data.access_token);
             }
 
@@ -32,7 +31,6 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
-    const [rememberMe, setRememberMe] = useState(false);
 
     const handleInputChange = (field, value) => {
         setFormData((prev) => ({
@@ -56,15 +54,13 @@ export default function LoginPage() {
         try {
             const result = await loginAPI.login({
                 email: formData.email,
-                password: formData.password,
-                rememberMe: rememberMe
+                password: formData.password
             });
 
             setMessage({
                 type: 'success',
                 text: 'Login successful! Welcome back to Thrifter Babes!'
             });
-
             // Clear form after successful login
             setFormData({
                 email: '',
@@ -73,7 +69,7 @@ export default function LoginPage() {
 
             // Redirect to dashboard after 1.5 seconds
             setTimeout(() => {
-                window.location.href = '/dashboard';
+                window.location.href = '/';
             }, 1500);
         } catch (error) {
             const apiError = handleApiError(error);
@@ -179,25 +175,6 @@ export default function LoginPage() {
                                     )}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Remember Me Checkbox */}
-                        <div className="flex items-center justify-center gap-3">
-                            <input
-                                type="checkbox"
-                                id="rememberMe"
-                                checked={rememberMe}
-                                onChange={(e) =>
-                                    setRememberMe(e.target.checked)
-                                }
-                                className="w-4 h-4 text-pink-600 bg-white border-gray-300 rounded focus:ring-pink-500 focus:ring-2"
-                            />
-                            <label
-                                htmlFor="rememberMe"
-                                className="text-gray-700 font-medium"
-                            >
-                                Remember Me
-                            </label>
                         </div>
 
                         {/* Submit Button */}
