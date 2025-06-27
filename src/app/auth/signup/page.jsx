@@ -345,17 +345,6 @@ export default function SignUpPage() {
 
                         {/* Links */}
                         <div className="text-center space-y-3 pt-6">
-                            <div className="pt-4">
-                                <span className="text-gray-600">
-                                    {'I have an account? '}
-                                </span>
-                                <Link
-                                    href="/auth/login"
-                                    className="text-pink-600 hover:text-pink-700 underline font-medium transition-colors"
-                                >
-                                    Sign in Here
-                                </Link>
-                            </div>
                             <div>
                                 <Link
                                     href="/forgot-password"
@@ -372,6 +361,7 @@ export default function SignUpPage() {
                                     Forgot Username?
                                 </Link>
                             </div>
+                             
                         </div>
                     </form>
                 </div>

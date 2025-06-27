@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import DashboardLayout from '@/components/dashboard-layout';
+import DashboardLayout from '../components/dashboard-layout';
+
 import {
     TrendingUp,
     Package,

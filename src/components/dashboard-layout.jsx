@@ -18,8 +18,8 @@ import {
     MessageSquare,
     BarChart3
 } from 'lucide-react';
-import api from '@/lib/api';
-import handleApiError from '@/lib/handleApiError';
+import api from '../lib/api';
+import handleApiError from '../lib/handleApiError';
 
 // API functions
 const dashboardAPI = {
@@ -40,7 +40,7 @@ const dashboardAPI = {
 
 // Navigation items
 const navigationItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home, current: false },
+    { name: 'Dashboard', href: '/', icon: Home, current: false },
     {
         name: 'Products',
         href: '/dashboard/products',
