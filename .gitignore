@@ -1,0 +1,36 @@
+# Node dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+
+# Production build
+dist/
+
+# npm logs
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode/
+.idea/
+
+# OS swap/temp files
+*.swp
+*.tmp
+
+# Optional: If using Mac
+.AppleDouble
+.LSOverride
