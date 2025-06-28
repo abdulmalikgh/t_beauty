@@ -18,6 +18,8 @@ import {
     MessageSquare,
     BarChart3
 } from 'lucide-react';
+import { usePathname } from 'next/navigation'
+
 import api from '../lib/api';
 import handleApiError from '../lib/handleApiError';
 
@@ -43,7 +45,7 @@ const navigationItems = [
     { name: 'Dashboard', href: '/', icon: Home, current: false },
     {
         name: 'Products',
-        href: '/dashboard/products',
+        href: '/products',
         icon: Package,
         current: false
     },
@@ -116,6 +118,7 @@ export default function DashboardLayout({
             unread: false
         }
     ]);
+    const pathname = usePathname();
 
     // Update navigation current state based on current path
     const updatedNavigation = navigationItems.map((item) => ({
@@ -260,13 +263,13 @@ export default function DashboardLayout({
                                 key={item.name}
                                 href={item.href}
                                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                                    item.current
+                                    item.href === pathname
                                         ? 'bg-pink-200 text-gray-900'
                                         : 'text-gray-700 hover:bg-pink-200 hover:text-gray-900'
                                 }`}
                             >
                                 <item.icon className="mr-3 h-5 w-5" />
-                                {item.name}
+                                {item.name} 
                             </a>
                         ))}
                     </nav>
