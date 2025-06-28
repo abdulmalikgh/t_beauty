@@ -16,9 +16,10 @@ import {
     Home,
     Tag,
     MessageSquare,
-    BarChart3
+    BarChart3,
+    Building2
 } from 'lucide-react';
-import { usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation';
 
 import api from '../lib/api';
 import handleApiError from '../lib/handleApiError';
@@ -35,7 +36,7 @@ const dashboardAPI = {
     },
 
     logout: async () => {
-        await api.post('/auth/logout');
+        await api.post('/auth/login');
         localStorage.removeItem('authToken');
     }
 };
@@ -44,21 +45,15 @@ const dashboardAPI = {
 const navigationItems = [
     { name: 'Dashboard', href: '/', icon: Home, current: false },
     {
-        name: 'Products',
-        href: '/products',
-        icon: Package,
-        current: false
-    },
-    {
         name: 'Customers',
         href: '/customers',
         icon: Users,
         current: false
     },
     {
-        name: 'Orders',
-        href: '/orders',
-        icon: ShoppingBag,
+        name: 'Brands',
+        href: '/brands',
+        icon: Building2,
         current: false
     },
     {
@@ -68,23 +63,23 @@ const navigationItems = [
         current: false
     },
     {
-        name: 'Reviews',
-        href: '/reviews',
+        name: 'Products',
+        href: '/products',
+        icon: Package,
+        current: false
+    },
+    {
+        name: 'Inventories',
+        href: '/inventories',
         icon: MessageSquare,
         current: false
     },
     {
-        name: 'Analytics',
-        href: '/analytics',
-        icon: BarChart3,
+        name: 'Orders',
+        href: '/orders',
+        icon: ShoppingBag,
         current: false
     },
-    {
-        name: 'Favorites',
-        href: '/favorites',
-        icon: Heart,
-        current: false
-    }
 ];
 
 export default function DashboardLayout({
@@ -269,7 +264,7 @@ export default function DashboardLayout({
                                 }`}
                             >
                                 <item.icon className="mr-3 h-5 w-5" />
-                                {item.name} 
+                                {item.name}
                             </a>
                         ))}
                     </nav>
@@ -302,7 +297,7 @@ export default function DashboardLayout({
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="w-full text-white font-medium py-2 px-4 rounded-lg hover:opacity-90 transition-opacity text-sm"
+                            className="w-full text-white font-medium py-2 px-4 rounded-lg hover:opacity-90 transition-opacity text-sm cursor-pointer"
                             style={{ backgroundColor: '#E213A7' }}
                         >
                             Logout
@@ -374,7 +369,6 @@ export default function DashboardLayout({
                             )}
 
                             {/* Add button */}
-                            
                         </div>
                     </div>
                 </header>
