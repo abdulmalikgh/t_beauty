@@ -17,7 +17,8 @@ import {
     Tag,
     MessageSquare,
     BarChart3,
-    Building2
+    Building2,
+    Warehouse
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -71,7 +72,7 @@ const navigationItems = [
     {
         name: 'Inventories',
         href: '/inventories',
-        icon: MessageSquare,
+        icon:  Warehouse,
         current: false
     },
     {

@@ -9,15 +9,16 @@ import {
   Edit,
   Trash2,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   X,
   AlertTriangle,
   DollarSign,
   Archive,
   CheckCircle,
-  XCircle,
   Hash,
+  Weight,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import api from "../../lib/api"
 import handleApiError from "../../lib/handleApiError"
@@ -27,6 +28,14 @@ const productsAPI = {
   getProducts: async (params) => {
     try {
       const response = await api.get("/products", { params })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
+  getProductStats: async () => {
+    try {
+      const response = await api.get("/products/stats")
       return response.data
     } catch (error) {
       throw error
@@ -82,6 +91,9 @@ const categoriesAPI = {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([])
+  const [brands, setBrands] = useState([])
+  const [categories, setCategories] = useState([])
+  const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [showModal, setShowModal] = useState(false)
@@ -92,31 +104,33 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [showViewModal, setShowViewModal] = useState(false)
   const [productToView, setProductToView] = useState(null)
-  const [brands, setBrands] = useState([])
-  const [categories, setCategories] = useState([])
 
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [totalProducts, setTotalProducts] = useState(0)
+  const [totalItems, setTotalItems] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedBrand, setSelectedBrand] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [activeOnly, setActiveOnly] = useState(false)
 
-  // Form data
+  // Form data - updated to match API structure
   const initialFormData = {
     name: "",
     description: "",
-    price: "",
-    quantity: "",
     sku: "",
+    base_price: "", // Changed back to base_price
     brand_id: "",
     category_id: "",
+    weight: "",
+    is_active: true,
   }
   const [formData, setFormData] = useState(initialFormData)
 
   // Calculate pagination
-  const totalPages = Math.ceil(totalProducts / pageSize)
+  const totalPages = Math.ceil(totalItems / pageSize)
   const startIndex = (currentPage - 1) * pageSize + 1
-  const endIndex = Math.min(currentPage * pageSize, totalProducts)
+  const endIndex = Math.min(currentPage * pageSize, totalItems)
 
   // Fetch products
   const fetchProducts = async () => {
@@ -128,15 +142,27 @@ export default function ProductsPage() {
         size: pageSize,
       }
       if (searchTerm) params.search = searchTerm
+      if (selectedBrand) params.brand_id = selectedBrand
+      if (selectedCategory) params.category_id = selectedCategory
+      if (activeOnly) params.is_active = true
 
       const data = await productsAPI.getProducts(params)
       setProducts(data.products || [])
-      setTotalProducts(data.total || 0)
+      setTotalItems(data.total || 0)
     } catch (error) {
       const apiError = handleApiError(error)
       setError(apiError.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchStats = async () => {
+    try {
+      const data = await productsAPI.getProductStats()
+      setStats(data)
+    } catch (error) {
+      console.error("Failed to fetch stats:", error)
     }
   }
 
@@ -181,11 +207,12 @@ export default function ProductsPage() {
     setFormData({
       name: product.name || "",
       description: product.description || "",
-      price: product.price?.toString() || "",
-      quantity: product.quantity?.toString() || "",
       sku: product.sku || "",
+      base_price: product.base_price?.toString() || "", // Changed to base_price
       brand_id: product.brand_id?.toString() || "",
       category_id: product.category_id?.toString() || "",
+      weight: product.weight?.toString() || "",
+      is_active: product.is_active !== undefined ? product.is_active : true,
     })
     setShowModal(true)
   }
@@ -198,11 +225,12 @@ export default function ProductsPage() {
       const productData = {
         name: formData.name,
         description: formData.description,
-        price: Number.parseFloat(formData.price) || 0,
-        quantity: Number.parseInt(formData.quantity) || 0,
         sku: formData.sku,
-        brand_id: formData.brand_id ? Number.parseInt(formData.brand_id) : null,
-        category_id: formData.category_id ? Number.parseInt(formData.category_id) : null,
+        base_price: Number.parseFloat(formData.base_price) || 0, // Changed to base_price
+        brand_id: Number.parseInt(formData.brand_id) || null,
+        category_id: Number.parseInt(formData.category_id) || null,
+        weight: Number.parseFloat(formData.weight) || 0,
+        is_active: formData.is_active,
       }
 
       if (modalMode === "add") {
@@ -214,7 +242,8 @@ export default function ProductsPage() {
       setShowModal(false)
       setFormData(initialFormData)
       setSelectedProduct(null)
-      fetchProducts() // Refresh the list
+      fetchProducts()
+      fetchStats()
     } catch (error) {
       const apiError = handleApiError(error)
       setError(apiError.message)
@@ -232,7 +261,8 @@ export default function ProductsPage() {
       await productsAPI.deleteProduct(productToDelete.id)
       setShowDeleteModal(false)
       setProductToDelete(null)
-      fetchProducts() // Refresh the list
+      fetchProducts()
+      fetchStats()
     } catch (error) {
       const apiError = handleApiError(error)
       setError(apiError.message)
@@ -247,15 +277,15 @@ export default function ProductsPage() {
     setShowViewModal(true)
   }
 
-  // Handle search with debounce
+  // Handle search and filters with debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Reset to first page when searching
+      setCurrentPage(1)
       fetchProducts()
     }, 500)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm])
+  }, [searchTerm, selectedBrand, selectedCategory, activeOnly])
 
   // Fetch products on page/size change
   useEffect(() => {
@@ -265,17 +295,10 @@ export default function ProductsPage() {
   // Initial load
   useEffect(() => {
     fetchProducts()
+    fetchStats()
     fetchBrands()
     fetchCategories()
   }, [])
-
-  const getStatusColor = (isActive) => {
-    return isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-  }
-
-  const getStatusIcon = (isActive) => {
-    return isActive ? <CheckCircle size={16} /> : <XCircle size={16} />
-  }
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("en-US", {
@@ -284,26 +307,56 @@ export default function ProductsPage() {
     }).format(price)
   }
 
-  const getStockStatus = (quantity) => {
-    if (quantity === 0) return { text: "Out of Stock", color: "bg-red-100 text-red-800" }
-    if (quantity <= 5) return { text: "Low Stock", color: "bg-yellow-100 text-yellow-800" }
-    return { text: "In Stock", color: "bg-green-100 text-green-800" }
+  const formatWeight = (weight) => {
+    if (!weight) return "N/A"
+    return `${weight} kg`
   }
 
-  const getBrandName = (brandId) => {
-    if (!brandId) return "No Brand"
-    const brand = brands.find((b) => b.id === brandId)
-    return brand ? brand.name : "Unknown Brand"
+  // Helper function to safely render brand name - handles both string and object cases
+  const renderBrandName = (product) => {
+    if (!product) return "No Brand"
+
+    // If brand is an object with name property, extract it
+    if (typeof product.brand === "object" && product.brand !== null) {
+      return product.brand.name || "Unknown Brand"
+    }
+
+    // If brand_id exists, find brand in brands array
+    if (product.brand_id) {
+      const brand = brands.find((b) => b.id === product.brand_id)
+      return brand ? brand.name : "Unknown Brand"
+    }
+
+    return "No Brand"
   }
 
-  const getCategoryName = (categoryId) => {
-    if (!categoryId) return "No Category"
-    const category = categories.find((c) => c.id === categoryId)
-    return category ? category.name : "Unknown Category"
+  // Helper function to safely render category name - handles both string and object cases
+  const renderCategoryName = (product) => {
+    if (!product) return "No Category"
+
+    // If category is an object with name property, extract it
+    if (typeof product.category === "object" && product.category !== null) {
+      return product.category.name || "Unknown Category"
+    }
+
+    // If category_id exists, find category in categories array
+    if (product.category_id) {
+      const category = categories.find((c) => c.id === product.category_id)
+      return category ? category.name : "Unknown Category"
+    }
+
+    return "No Category"
+  }
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setSelectedBrand("")
+    setSelectedCategory("")
+    setActiveOnly(false)
   }
 
   return (
-    <DashboardLayout title="Products" subtitle="Manage your product inventory" currentPath="/dashboard/products">
+    <DashboardLayout title="Products" subtitle="Manage your product catalog" currentPath="/dashboard/products">
       <div className="max-w-7xl mx-auto">
         {/* Error Message */}
         {error && (
@@ -332,7 +385,7 @@ export default function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold text-gray-800">{totalProducts}</p>
+                <p className="text-2xl font-bold text-gray-800">{stats.total_products || totalItems}</p>
               </div>
               <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
                 <Package size={24} style={{ color: "#E213A7" }} />
@@ -344,7 +397,9 @@ export default function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Products</p>
-                <p className="text-2xl font-bold text-gray-800">{products.filter((p) => p.is_active).length}</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {stats.active_products || products.filter((p) => p.is_active).length}
+                </p>
               </div>
               <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
                 <CheckCircle size={24} style={{ color: "#E213A7" }} />
@@ -355,13 +410,13 @@ export default function ProductsPage() {
           <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Low Stock</p>
+                <p className="text-sm font-medium text-gray-600">Inactive Products</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {products.filter((p) => p.quantity <= 5 && p.quantity > 0).length}
+                  {stats.inactive_products || products.filter((p) => !p.is_active).length}
                 </p>
               </div>
               <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
-                <AlertTriangle size={24} style={{ color: "#E213A7" }} />
+                <Archive size={24} style={{ color: "#E213A7" }} />
               </div>
             </div>
           </div>
@@ -369,11 +424,16 @@ export default function ProductsPage() {
           <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Out of Stock</p>
-                <p className="text-2xl font-bold text-gray-800">{products.filter((p) => p.quantity === 0).length}</p>
+                <p className="text-sm font-medium text-gray-600">Avg. Price</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {formatPrice(
+                    stats.average_price ||
+                      products.reduce((sum, p) => sum + (p.base_price || 0), 0) / (products.length || 1),
+                  )}
+                </p>
               </div>
               <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
-                <Archive size={24} style={{ color: "#E213A7" }} />
+                <DollarSign size={24} style={{ color: "#E213A7" }} />
               </div>
             </div>
           </div>
@@ -387,15 +447,59 @@ export default function ProductsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search products by name or description..."
+                placeholder="Search products by name, SKU, or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
               />
             </div>
 
-            {/* Page Size */}
-            <div className="flex gap-4">
+            {/* Filters */}
+            <div className="flex flex-wrap gap-4">
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+              >
+                <option value="">All Brands</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg">
+                <input
+                  type="checkbox"
+                  checked={activeOnly}
+                  onChange={(e) => setActiveOnly(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">Active Only</span>
+              </label>
+
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              >
+                <Filter size={16} />
+                <span>Clear</span>
+              </button>
+
               <select
                 value={pageSize}
                 onChange={(e) => {
@@ -418,7 +522,7 @@ export default function ProductsPage() {
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">
-                Products ({startIndex}-{endIndex} of {totalProducts})
+                Products ({startIndex}-{endIndex} of {totalItems})
               </h3>
             </div>
           </div>
@@ -450,16 +554,13 @@ export default function ProductsPage() {
                         Category
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Price
+                        Base Price
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Stock
+                        Weight
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Created
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
@@ -467,10 +568,9 @@ export default function ProductsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {products.map((product) => {
-                      const stockStatus = getStockStatus(product.quantity)
+                    {products.map((product, index) => {
                       return (
-                        <tr key={product.id} className="hover:bg-gray-50">
+                        <tr key={product.id || index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center mr-3">
@@ -491,35 +591,31 @@ export default function ProductsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600">{getBrandName(product.brand_id)}</span>
+                            <span className="text-sm text-gray-600">{renderBrandName(product)}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600">{getCategoryName(product.category_id)}</span>
+                            <span className="text-sm text-gray-600">{renderCategoryName(product)}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 flex items-center">
                               <DollarSign size={12} className="mr-1" />
-                              {formatPrice(product.price)}
+                              {formatPrice(product.base_price || 0)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-gray-900">{product.quantity} units</span>
-                              <span className={`text-xs px-2 py-1 rounded-full mt-1 ${stockStatus.color}`}>
-                                {stockStatus.text}
-                              </span>
+                            <div className="text-sm text-gray-600 flex items-center">
+                              <Weight size={12} className="mr-1" />
+                              {formatWeight(product.weight)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(product.is_active)}`}
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                product.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                              }`}
                             >
-                              {getStatusIcon(product.is_active)}
-                              <span className="ml-1">{product.is_active ? "Active" : "Inactive"}</span>
+                              {product.is_active ? "Active" : "Inactive"}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {product.created_at ? new Date(product.created_at).toLocaleDateString() : "N/A"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end space-x-2">
@@ -561,7 +657,7 @@ export default function ProductsPage() {
                 <div className="px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-700">
-                      Showing {startIndex} to {endIndex} of {totalProducts} products
+                      Showing {startIndex} to {endIndex} of {totalItems} products
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
@@ -622,7 +718,9 @@ export default function ProductsPage() {
                   </div>
                   <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
                   <p className="text-gray-600 mb-4">
-                    {searchTerm ? "Try adjusting your search criteria" : "Get started by adding your first product"}
+                    {searchTerm || selectedBrand || selectedCategory || activeOnly
+                      ? "Try adjusting your search criteria"
+                      : "Get started by adding your first product"}
                   </p>
                   <button
                     onClick={openAddModal}
@@ -640,7 +738,7 @@ export default function ProductsPage() {
         {/* Add/Edit Product Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-800">
@@ -653,19 +751,35 @@ export default function ProductsPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* Product Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
-                    placeholder="Enter product name"
-                  />
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Product Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                      placeholder="Enter product name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      SKU <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.sku}
+                      onChange={(e) => handleInputChange("sku", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                      placeholder="Enter SKU"
+                    />
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -680,23 +794,8 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                {/* SKU */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SKU <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.sku}
-                    onChange={(e) => handleInputChange("sku", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
-                    placeholder="Enter product SKU"
-                  />
-                </div>
-
                 {/* Brand and Category */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
                     <select
@@ -705,15 +804,14 @@ export default function ProductsPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
                     >
                       <option value="">Select a brand</option>
-                      {brands
-                        .filter((brand) => brand.is_active)
-                        .map((brand) => (
-                          <option key={brand.id} value={brand.id}>
-                            {brand.name}
-                          </option>
-                        ))}
+                      {brands.map((brand) => (
+                        <option key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                     <select
@@ -722,48 +820,58 @@ export default function ProductsPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
                     >
                       <option value="">Select a category</option>
-                      {categories
-                        .filter((category) => category.is_active)
-                        .map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Price and Quantity */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Price, Weight, and Quantity */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price ($) <span className="text-red-500">*</span>
+                      Base Price ($) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
                       required
                       min="0"
                       step="0.01"
-                      value={formData.price}
-                      onChange={(e) => handleInputChange("price", e.target.value)}
+                      value={formData.base_price}
+                      onChange={(e) => handleInputChange("base_price", e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
                       placeholder="0.00"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Quantity <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Weight (kg)</label>
                     <input
                       type="number"
-                      required
                       min="0"
-                      value={formData.quantity}
-                      onChange={(e) => handleInputChange("quantity", e.target.value)}
+                      step="0.01"
+                      value={formData.weight}
+                      onChange={(e) => handleInputChange("weight", e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
-                      placeholder="0"
+                      placeholder="0.00"
                     />
                   </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Active Product</span>
+                  </label>
                 </div>
 
                 {/* Form Actions */}
@@ -812,7 +920,7 @@ export default function ProductsPage() {
 
                 <p className="text-gray-700 mb-6">
                   Are you sure you want to delete <span className="font-medium">"{productToDelete.name}"</span>? This
-                  will permanently remove the product from your inventory.
+                  will permanently remove the product from your catalog.
                 </p>
 
                 <div className="flex items-center justify-end space-x-4">
@@ -841,7 +949,7 @@ export default function ProductsPage() {
         {/* View Product Modal */}
         {showViewModal && productToView && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-800">Product Details</h3>
@@ -859,49 +967,58 @@ export default function ProductsPage() {
                   </div>
                   <div>
                     <h4 className="text-xl font-semibold text-gray-800">{productToView.name}</h4>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(productToView.is_active)}`}
-                      >
-                        {getStatusIcon(productToView.is_active)}
-                        <span className="ml-1">{productToView.is_active ? "Active" : "Inactive"}</span>
-                      </span>
-                    </div>
+                    <p className="text-sm text-gray-600">{productToView.description}</p>
                   </div>
                 </div>
 
-                {/* Product Information */}
+                {/* Basic Information */}
                 <div>
-                  <h5 className="text-md font-medium text-gray-800 mb-3">Product Information</h5>
-                  <div className="space-y-3">
+                  <h5 className="text-md font-medium text-gray-800 mb-3">Basic Information</h5>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="flex justify-between">
                       <span className="text-gray-600">SKU:</span>
                       <code className="bg-gray-100 px-2 py-1 rounded text-sm">{productToView.sku || "No SKU"}</code>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Brand:</span>
-                      <span className="font-medium text-gray-800">{getBrandName(productToView.brand_id)}</span>
+                      <span className="font-medium text-gray-800">{renderBrandName(productToView)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Category:</span>
-                      <span className="font-medium text-gray-800">{getCategoryName(productToView.category_id)}</span>
+                      <span className="font-medium text-gray-800">{renderCategoryName(productToView)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Price:</span>
-                      <span className="font-medium text-gray-800">{formatPrice(productToView.price)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Quantity:</span>
-                      <span className="font-medium text-gray-800">{productToView.quantity} units</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Stock Status:</span>
+                      <span className="text-gray-600">Status:</span>
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${getStockStatus(productToView.quantity).color}`}
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          productToView.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        }`}
                       >
-                        {getStockStatus(productToView.quantity).text}
+                        {productToView.is_active ? "Active" : "Inactive"}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Pricing & Physical */}
+                <div>
+                  <h5 className="text-md font-medium text-gray-800 mb-3">Pricing & Physical</h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Base Price:</span>
+                      <span className="font-medium text-gray-800">{formatPrice(productToView.base_price || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Weight:</span>
+                      <span className="font-medium text-gray-800">{formatWeight(productToView.weight)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div>
+                  <h5 className="text-md font-medium text-gray-800 mb-3">Timestamps</h5>
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Created:</span>
                       <span className="text-gray-800">
@@ -916,14 +1033,6 @@ export default function ProductsPage() {
                     )}
                   </div>
                 </div>
-
-                {/* Description */}
-                {productToView.description && (
-                  <div>
-                    <h5 className="text-md font-medium text-gray-800 mb-3">Description</h5>
-                    <div className="text-gray-700 bg-gray-50 p-3 rounded-lg">{productToView.description}</div>
-                  </div>
-                )}
 
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">

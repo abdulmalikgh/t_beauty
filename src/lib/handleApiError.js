@@ -32,7 +32,7 @@ const handleApiError = (error) => {
                 return {
                     status: 400,
                     message:
-                        data.message ||
+                        data.message || data.detail ||
                         'Invalid request. Please check your input.'
                 };
             default:

@@ -361,6 +361,17 @@ export default function SignUpPage() {
                                     Forgot Username?
                                 </Link>
                             </div>
+                            <div>
+                                <span>
+                                    Have an account?{' '}
+                                    <Link
+                                        href="/auth/login"
+                                        className="text-gray-700 hover:text-pink-600 underline text-base font-medium transition-colors"
+                                    >
+                                        Sign in
+                                    </Link>
+                                </span>
+                            </div>
                         </div>
                     </form>
                 </div>
