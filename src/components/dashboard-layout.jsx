@@ -35,9 +35,9 @@ const dashboardAPI = {
         }
     },
 
-    logout: async () => {
-        await api.post('/auth/login');
+    logout: () => {
         localStorage.removeItem('authToken');
+        window.location.href = '/auth/login';
     }
 };
 
@@ -79,7 +79,7 @@ const navigationItems = [
         href: '/orders',
         icon: ShoppingBag,
         current: false
-    },
+    }
 ];
 
 export default function DashboardLayout({

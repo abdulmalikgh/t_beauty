@@ -17,6 +17,9 @@ const handleApiError = (error) => {
             };
         }
 
+        if (status === 404) {
+            return data.detail;
+        }
         // Handle other status codes
         switch (status) {
             case 409:
