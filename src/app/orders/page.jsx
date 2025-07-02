@@ -20,9 +20,17 @@ import {
   User,
   Filter,
   MoreHorizontal,
+  CreditCard,
+  Receipt,
+  Banknote,
+  Smartphone,
+  Building,
+  Coins,
+  Zap,
 } from "lucide-react"
 import api from "../../lib/api"
 import handleApiError from "../../lib/handleApiError"
+import { useRouter } from "next/navigation"
 
 // API functions
 const ordersAPI = {
@@ -54,6 +62,42 @@ const ordersAPI = {
   },
 }
 
+// Payment API functions
+const paymentsAPI = {
+  createPayment: async (paymentData) => {
+    try {
+      const response = await api.post("/payments", paymentData)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
+  verifyPayment: async (paymentId) => {
+    try {
+      const response = await api.post(`/payments/${paymentId}/verify`)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
+  getPaymentStats: async () => {
+    try {
+      const response = await api.get("/payments/stats")
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
+  getOrderPayments: async (orderId) => {
+    try {
+      const response = await api.get(`/orders/${orderId}/payments`)
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -65,6 +109,12 @@ export default function OrdersPage() {
   const [cancelReason, setCancelReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [orderToPayFor, setOrderToPayFor] = useState(null)
+  const [orderPayments, setOrderPayments] = useState([])
+  const [paymentStats, setPaymentStats] = useState({})
+
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -72,6 +122,32 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("")
+
+  // Payment form data
+  const initialPaymentFormData = {
+    amount: "",
+    payment_method: "cash",
+    payment_date: new Date().toISOString().slice(0, 16),
+    notes: "",
+    bank_name: "",
+    account_number: "",
+    transaction_reference: "",
+    pos_terminal_id: "",
+    mobile_money_number: "",
+  }
+
+  const [paymentFormData, setPaymentFormData] = useState(initialPaymentFormData)
+
+  // Payment methods configuration
+  const paymentMethods = [
+    { value: "cash", label: "Cash", icon: <Banknote size={16} /> },
+    { value: "bank_transfer", label: "Bank Transfer", icon: <Building size={16} /> },
+    { value: "pos", label: "POS Terminal", icon: <CreditCard size={16} /> },
+    { value: "mobile_money", label: "Mobile Money", icon: <Smartphone size={16} /> },
+    { value: "instagram_payment", label: "Instagram Payment", icon: <Receipt size={16} /> },
+    { value: "crypto", label: "Cryptocurrency", icon: <Coins size={16} /> },
+    { value: "other", label: "Other", icon: <MoreHorizontal size={16} /> },
+  ]
 
   // Calculate pagination
   const totalPages = Math.ceil(totalOrders / pageSize)
@@ -108,6 +184,16 @@ export default function OrdersPage() {
     }
   }
 
+  // Fetch payment stats
+  const fetchPaymentStats = async () => {
+    try {
+      const data = await paymentsAPI.getPaymentStats()
+      setPaymentStats(data)
+    } catch (error) {
+      console.error("Failed to fetch payment stats:", error)
+    }
+  }
+
   // Handle confirm order
   const handleConfirmOrder = async (orderId) => {
     setIsSubmitting(true)
@@ -125,7 +211,6 @@ export default function OrdersPage() {
   // Handle cancel order
   const handleCancelOrder = async () => {
     if (!orderToCancel || !cancelReason.trim()) return
-
     setIsSubmitting(true)
     try {
       await ordersAPI.cancelOrder(orderToCancel.id, cancelReason)
@@ -147,13 +232,112 @@ export default function OrdersPage() {
     setShowViewModal(true)
   }
 
+  // Handle payment modal
+  const handleOpenPaymentModal = async (order) => {
+    setOrderToPayFor(order)
+    setPaymentFormData({
+      ...initialPaymentFormData,
+      amount: order.outstanding_amount || order.total_amount || 0,
+    })
+
+    // Fetch existing payments for this order
+    try {
+      const payments = await paymentsAPI.getOrderPayments(order.id)
+      setOrderPayments(payments)
+    } catch (error) {
+      console.error("Failed to fetch order payments:", error)
+      setOrderPayments([])
+    }
+
+    setShowPaymentModal(true)
+  }
+
+  // Handle payment form input changes
+  const handlePaymentInputChange = (field, value) => {
+    setPaymentFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  // Handle payment submission
+  const handleSubmitPayment = async (e) => {
+    e.preventDefault()
+    if (!orderToPayFor) return
+
+    setIsSubmitting(true)
+    try {
+      const paymentData = {
+        customer_id: orderToPayFor.customer?.id,
+        order_id: orderToPayFor.id,
+        amount: Number.parseFloat(paymentFormData.amount),
+        payment_method: paymentFormData.payment_method,
+        payment_date: paymentFormData.payment_date,
+        notes: paymentFormData.notes,
+      }
+
+      // Add method-specific fields
+      if (paymentFormData.payment_method === "bank_transfer") {
+        paymentData.bank_name = paymentFormData.bank_name
+        paymentData.account_number = paymentFormData.account_number
+        paymentData.transaction_reference = paymentFormData.transaction_reference
+      } else if (paymentFormData.payment_method === "pos") {
+        paymentData.pos_terminal_id = paymentFormData.pos_terminal_id
+        paymentData.transaction_reference = paymentFormData.transaction_reference
+      } else if (paymentFormData.payment_method === "mobile_money") {
+        paymentData.mobile_money_number = paymentFormData.mobile_money_number
+        paymentData.transaction_reference = paymentFormData.transaction_reference
+      }
+
+      const result = await paymentsAPI.createPayment(paymentData)
+
+      setShowPaymentModal(false)
+      setOrderToPayFor(null)
+      setPaymentFormData(initialPaymentFormData)
+      fetchOrders() // Refresh orders
+      fetchPaymentStats() // Refresh payment stats
+
+      // Show success message
+      setError("")
+      alert(`Payment created successfully! Reference: ${result.payment_reference}`)
+    } catch (error) {
+      const apiError = handleApiError(error)
+      setError(apiError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle payment verification
+  const handleVerifyPayment = async (paymentId) => {
+    setIsSubmitting(true)
+    try {
+      const result = await paymentsAPI.verifyPayment(paymentId)
+
+      // Refresh order payments
+      if (orderToPayFor) {
+        const payments = await paymentsAPI.getOrderPayments(orderToPayFor.id)
+        setOrderPayments(payments)
+      }
+
+      fetchOrders() // Refresh orders
+      fetchPaymentStats() // Refresh payment stats
+
+      alert(`Payment verified successfully! Amount: ${formatPrice(result.amount)}`)
+    } catch (error) {
+      const apiError = handleApiError(error)
+      setError(apiError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   // Handle search and filters with debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
       fetchOrders()
     }, 500)
-
     return () => clearTimeout(timeoutId)
   }, [searchTerm, statusFilter, paymentStatusFilter])
 
@@ -165,6 +349,7 @@ export default function OrdersPage() {
   // Initial load
   useEffect(() => {
     fetchOrders()
+    fetchPaymentStats()
   }, [])
 
   const formatPrice = (price) => {
@@ -208,6 +393,11 @@ export default function OrdersPage() {
     return icons[status] || <Clock size={12} />
   }
 
+  const getPaymentMethodIcon = (method) => {
+    const methodConfig = paymentMethods.find((m) => m.value === method)
+    return methodConfig ? methodConfig.icon : <CreditCard size={16} />
+  }
+
   const clearFilters = () => {
     setSearchTerm("")
     setStatusFilter("")
@@ -218,11 +408,12 @@ export default function OrdersPage() {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = Math.floor((now - date) / (1000 * 60 * 60))
-
     if (diffInHours < 1) return "Just now"
     if (diffInHours < 24) return `${diffInHours}h ago`
     return `${Math.floor(diffInHours / 24)}d ago`
   }
+
+  const router = useRouter()
 
   return (
     <DashboardLayout title="Orders" subtitle="Manage customer orders" currentPath="/orders">
@@ -249,7 +440,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
@@ -314,6 +505,19 @@ export default function OrdersPage() {
               </div>
               <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
                 <DollarSign size={24} style={{ color: "#E213A7" }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Payments</p>
+                <p className="text-2xl font-bold text-gray-800">{paymentStats.total_payments || 0}</p>
+                <p className="text-xs text-gray-500">{paymentStats.verified_payments || 0} verified</p>
+              </div>
+              <div className="p-3 rounded-lg" style={{ backgroundColor: "#FFE3EC" }}>
+                <CreditCard size={24} style={{ color: "#E213A7" }} />
               </div>
             </div>
           </div>
@@ -510,6 +714,17 @@ export default function OrdersPage() {
                             >
                               <Eye size={16} />
                             </button>
+                            {(order.outstanding_amount > 0 ||
+                              order.payment_status === "pending" ||
+                              order.payment_status === "partial") && (
+                              <button
+                                onClick={() => router.push(`/payment?order_id=${order.id}`)}
+                                className="text-gray-400 hover:text-green-600 p-1"
+                                title="Add Payment"
+                              >
+                                <CreditCard size={16} />
+                              </button>
+                            )}
                             {order.status === "pending" && (
                               <button
                                 onClick={() => handleConfirmOrder(order.id)}
@@ -626,6 +841,238 @@ export default function OrdersPage() {
           )}
         </div>
 
+        {/* Payment Modal */}
+        {showPaymentModal && orderToPayFor && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-800">Add Payment</h3>
+                  <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-gray-600">
+                    <X size={24} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  Order: {orderToPayFor.order_number} | Outstanding:{" "}
+                  {formatPrice(orderToPayFor.outstanding_amount || orderToPayFor.total_amount)}
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmitPayment} className="p-6 space-y-6">
+                {/* Payment Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Amount <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    max={orderToPayFor.outstanding_amount || orderToPayFor.total_amount}
+                    value={paymentFormData.amount}
+                    onChange={(e) => handlePaymentInputChange("amount", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Method <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={paymentFormData.payment_method}
+                    onChange={(e) => handlePaymentInputChange("payment_method", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                  >
+                    {paymentMethods.map((method) => (
+                      <option key={method.value} value={method.value}>
+                        {method.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Payment Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={paymentFormData.payment_date}
+                    onChange={(e) => handlePaymentInputChange("payment_date", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Method-specific fields */}
+                {paymentFormData.payment_method === "bank_transfer" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.bank_name}
+                        onChange={(e) => handlePaymentInputChange("bank_name", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter bank name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.account_number}
+                        onChange={(e) => handlePaymentInputChange("account_number", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter account number"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Reference</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.transaction_reference}
+                        onChange={(e) => handlePaymentInputChange("transaction_reference", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter transaction reference"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {paymentFormData.payment_method === "pos" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">POS Terminal ID</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.pos_terminal_id}
+                        onChange={(e) => handlePaymentInputChange("pos_terminal_id", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter POS terminal ID"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Reference</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.transaction_reference}
+                        onChange={(e) => handlePaymentInputChange("transaction_reference", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter transaction reference"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {paymentFormData.payment_method === "mobile_money" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Money Number</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.mobile_money_number}
+                        onChange={(e) => handlePaymentInputChange("mobile_money_number", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter mobile money number"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Reference</label>
+                      <input
+                        type="text"
+                        value={paymentFormData.transaction_reference}
+                        onChange={(e) => handlePaymentInputChange("transaction_reference", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                        placeholder="Enter transaction reference"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                  <textarea
+                    value={paymentFormData.notes}
+                    onChange={(e) => handlePaymentInputChange("notes", e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                    placeholder="Enter payment notes (optional)"
+                  />
+                </div>
+
+                {/* Existing Payments */}
+                {orderPayments.length > 0 && (
+                  <div>
+                    <h4 className="text-md font-medium text-gray-800 mb-3">Existing Payments</h4>
+                    <div className="space-y-2">
+                      {orderPayments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            {getPaymentMethodIcon(payment.payment_method)}
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {formatPrice(payment.amount)} - {payment.payment_method.replace("_", " ")}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {payment.payment_reference} | {new Date(payment.payment_date).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {payment.is_verified ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <CheckCircle size={12} className="mr-1" />
+                                Verified
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleVerifyPayment(payment.id)}
+                                disabled={isSubmitting}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors"
+                              >
+                                <Zap size={12} className="mr-1" />
+                                Verify
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Actions */}
+                <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-6 py-2 text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: "#E213A7" }}
+                  >
+                    {isSubmitting ? "Processing..." : "Add Payment"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Cancel Order Modal */}
         {showCancelModal && orderToCancel && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -684,7 +1131,7 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {/* View Order Modal */}
+        {/* View Order Modal - keeping the existing one but adding payment info */}
         {showViewModal && orderToView && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -916,6 +1363,18 @@ export default function OrdersPage() {
 
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                  {orderToView.outstanding_amount > 0 && (
+                    <button
+                      onClick={() => {
+                        setShowViewModal(false)
+                        router.push(`/payment?order_id=${orderToView.id}`)
+                      }}
+                      className="px-4 py-2 text-white font-medium rounded-lg hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: "#E213A7" }}
+                    >
+                      Add Payment
+                    </button>
+                  )}
                   {orderToView.status === "pending" && (
                     <button
                       onClick={() => {
