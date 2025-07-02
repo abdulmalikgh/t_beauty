@@ -80,6 +80,12 @@ const navigationItems = [
         href: '/orders',
         icon: ShoppingBag,
         current: false
+    },
+     {
+        name: 'Payments',
+        href: '/payments',
+        icon: BarChart3,
+        current: false
     }
 ];
 
