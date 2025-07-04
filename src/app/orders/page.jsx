@@ -60,6 +60,17 @@ const ordersAPI = {
       throw error
     }
   },
+  updateOrderStatus: async (orderId, status, notes = "") => {
+    try {
+      const response = await api.put(`/orders/${orderId}/status`, {
+        status,
+        notes,
+      })
+      return response.data
+    } catch (error) {
+      throw error
+    }
+  },
 }
 
 // Payment API functions
@@ -153,6 +164,11 @@ export default function OrdersPage() {
   const totalPages = Math.ceil(totalOrders / pageSize)
   const startIndex = (currentPage - 1) * pageSize + 1
   const endIndex = Math.min(currentPage * pageSize, totalOrders)
+
+  // Modal state for updating order status
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [orderToUpdateStatus, setOrderToUpdateStatus] = useState(null)
+  const [selectedStatus, setSelectedStatus] = useState("")
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -324,6 +340,34 @@ export default function OrdersPage() {
       fetchPaymentStats() // Refresh payment stats
 
       alert(`Payment verified successfully! Amount: ${formatPrice(result.amount)}`)
+    } catch (error) {
+      const apiError = handleApiError(error)
+      setError(apiError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle mark as shipped
+  const handleMarkAsShipped = async (orderId) => {
+    setIsSubmitting(true)
+    try {
+      await ordersAPI.updateOrderStatus(orderId, "shipped", "Order shipped.")
+      fetchOrders()
+    } catch (error) {
+      const apiError = handleApiError(error)
+      setError(apiError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle mark as delivered
+  const handleMarkAsDelivered = async (orderId) => {
+    setIsSubmitting(true)
+    try {
+      await ordersAPI.updateOrderStatus(orderId, "delivered", "Order delivered.")
+      fetchOrders()
     } catch (error) {
       const apiError = handleApiError(error)
       setError(apiError.message)
@@ -747,6 +791,18 @@ export default function OrdersPage() {
                                 <XCircle size={16} />
                               </button>
                             )}
+                            {/* New: Open status modal */}
+                            <button
+                              onClick={() => {
+                                setOrderToUpdateStatus(order)
+                                setSelectedStatus(order.payment_status)
+                                setShowStatusModal(true)
+                              }}
+                              className="text-gray-400 hover:text-blue-600 p-1"
+                              title="Update Status"
+                            >
+                              <Truck size={16} />
+                            </button>
                             <button className="text-gray-400 hover:text-gray-600 p-1" title="More Actions">
                               <MoreHorizontal size={16} />
                             </button>
@@ -1403,6 +1459,64 @@ export default function OrdersPage() {
                     className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Update Modal */}
+        {showStatusModal && orderToUpdateStatus && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">Update Order Status</h3>
+                <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Status</label>
+                  <select
+                    value={selectedStatus}
+                    onChange={e => setSelectedStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowStatusModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsSubmitting(true)
+                      try {
+                        await ordersAPI.updateOrderStatus(orderToUpdateStatus.id, selectedStatus, `Status updated to ${selectedStatus}.`)
+                        setShowStatusModal(false)
+                        setOrderToUpdateStatus(null)
+                        fetchOrders()
+                      } catch (error) {
+                        const apiError = handleApiError(error)
+                        setError(apiError.message)
+                      } finally {
+                        setIsSubmitting(false)
+                      }
+                    }}
+                    disabled={isSubmitting}
+                    className="px-6 py-2 text-white font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                    style={{ backgroundColor: "#E213A7" }}
+                  >
+                    {isSubmitting ? "Updating..." : "Update Status"}
                   </button>
                 </div>
               </div>
