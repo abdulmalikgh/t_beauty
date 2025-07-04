@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/dashboard-layout';
-
+import api from '../lib/api';
+import Image from 'next/image';
 import {
     TrendingUp,
     Package,
     Heart,
-    ShoppingBag,
     Star,
     Grid,
     List,
     Filter,
-    Plus
+    Building2,
+    ShoppingBag
 } from 'lucide-react';
 
 // Mock data for dashboard
@@ -21,57 +22,6 @@ const mockStats = [
     { label: 'Favorites', value: '89', icon: Heart, change: '+5%' },
     { label: 'Orders', value: '156', icon: ShoppingBag, change: '+23%' },
     { label: 'Reviews', value: '4.8', icon: Star, change: '+0.2' }
-];
-
-const mockRecentItems = [
-    {
-        id: 1,
-        name: 'Vintage Denim Jacket',
-        price: '$45',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Jackets',
-        status: 'Available'
-    },
-    {
-        id: 2,
-        name: 'Designer Handbag',
-        price: '$120',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Bags',
-        status: 'Sold'
-    },
-    {
-        id: 3,
-        name: 'Retro Sunglasses',
-        price: '$25',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Accessories',
-        status: 'Available'
-    },
-    {
-        id: 4,
-        name: 'Vintage Band T-Shirt',
-        price: '$30',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Clothing',
-        status: 'Available'
-    },
-    {
-        id: 5,
-        name: 'Classic Leather Boots',
-        price: '$85',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Shoes',
-        status: 'Available'
-    },
-    {
-        id: 6,
-        name: 'Silk Scarf',
-        price: '$35',
-        image: '/placeholder.svg?height=80&width=80',
-        category: 'Accessories',
-        status: 'Sold'
-    }
 ];
 
 const mockNotifications = [
@@ -92,6 +42,26 @@ const mockNotifications = [
 
 export default function DashboardPage() {
     const [viewMode, setViewMode] = useState('grid');
+    const [recentProducts, setRecentProducts] = useState([]);
+
+    useEffect(() => {
+        const fetchRecentProducts = async () => {
+            try {
+                const response = await api.get('/products');
+                let products = response.data.products || response.data || [];
+                // Sort by created_at descending and take the latest 8
+                products = products
+                    .slice()
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .slice(0, 8);
+                setRecentProducts(products);
+            } catch (error) {
+                // Optionally handle error
+                setRecentProducts([]);
+            }
+        };
+        fetchRecentProducts();
+    }, []);
 
     const dashboardActions = (
         <>
@@ -191,7 +161,7 @@ export default function DashboardPage() {
                                             : 'space-y-4'
                                     }
                                 >
-                                    {mockRecentItems.map((item) => (
+                                    {recentProducts.map((item) => (
                                         <div
                                             key={item.id}
                                             className={`border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
@@ -202,55 +172,25 @@ export default function DashboardPage() {
                                         >
                                             <img
                                                 src={
-                                                    item.image ||
-                                                    '/placeholder.svg'
+                                                    item.thumbnail_url || item.primary_image_url || '/placeholder.svg?height=80&width=80'
                                                 }
+                                               
                                                 alt={item.name}
+                                                onError={(e) => {
+                                                    e.target.style.display = "none"
+                                                    e.target.nextSibling.style.display = "flex"
+                                                  }}
                                                 className={`rounded-lg object-cover ${
                                                     viewMode === 'list'
                                                         ? 'w-16 h-16 flex-shrink-0'
                                                         : 'w-full h-32 mb-3'
                                                 }`}
                                             />
-                                            <div
-                                                className={
-                                                    viewMode === 'list'
-                                                        ? 'flex-1'
-                                                        : ''
-                                                }
-                                            >
-                                                <h4 className="font-medium text-gray-800 mb-1">
-                                                    {item.name}
-                                                </h4>
-                                                <p className="text-sm text-gray-600 mb-2">
-                                                    {item.category}
-                                                </p>
-                                                <div
-                                                    className={`flex items-center justify-between ${
-                                                        viewMode === 'list'
-                                                            ? 'mt-1'
-                                                            : 'mt-2'
-                                                    }`}
-                                                >
-                                                    <span
-                                                        className="font-semibold"
-                                                        style={{
-                                                            color: '#E213A7'
-                                                        }}
-                                                    >
-                                                        {item.price}
-                                                    </span>
-                                                    <span
-                                                        className={`text-xs px-2 py-1 rounded-full ${
-                                                            item.status ===
-                                                            'Available'
-                                                                ? 'bg-green-100 text-green-800'
-                                                                : 'bg-gray-100 text-gray-800'
-                                                        }`}
-                                                    >
-                                                        {item.status}
-                                                    </span>
-                                                </div>
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                                                <div className="text-sm text-gray-500 max-w-xs truncate">{item.description || 'No description'}</div>
+                                                <div className="text-sm text-gray-500">{item.category.name || 'No category'}</div>
+                                                <div className="text-sm text-gray-800 font-semibold">${item.base_price || item.price || 'N/A'}</div>
                                             </div>
                                         </div>
                                     ))}
@@ -267,6 +207,7 @@ export default function DashboardPage() {
                                 <h3 className="text-lg font-semibold text-gray-800">
                                     Recent Activity
                                 </h3>
+                                <span className='text-sm'>(Future work)</span>
                             </div>
                             <div className="p-6">
                                 <div className="space-y-4 max-h-80 overflow-y-auto">
@@ -305,30 +246,35 @@ export default function DashboardPage() {
                             <div className="p-6 space-y-3">
                                 <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors group">
                                     <div className="flex items-center space-x-3">
-                                        <Plus
+                                        <a className='flex items-center space-x-3' href='/products'>
+                                            <Building2
+                                                size={20}
+                                                style={{ color: '#E213A7' }}
+                                                className="group-hover:scale-110 transition-transform"
+                                            />
+                                            <span className="text-gray-800 font-medium">
+                                                Products
+                                            </span>
+                                        </a>
+                                    </div>
+                                </button>
+                                <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors group">
+                                    <div className="flex items-center space-x-3">
+                                        <a href='/orders' className="flex items-center space-x-3">
+                                        <ShoppingBag
                                             size={20}
                                             style={{ color: '#E213A7' }}
                                             className="group-hover:scale-110 transition-transform"
                                         />
                                         <span className="text-gray-800 font-medium">
-                                            Add New Item
+                                            Orders Management
                                         </span>
+                                        </a>
                                     </div>
                                 </button>
                                 <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors group">
                                     <div className="flex items-center space-x-3">
-                                        <TrendingUp
-                                            size={20}
-                                            style={{ color: '#E213A7' }}
-                                            className="group-hover:scale-110 transition-transform"
-                                        />
-                                        <span className="text-gray-800 font-medium">
-                                            View Analytics
-                                        </span>
-                                    </div>
-                                </button>
-                                <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors group">
-                                    <div className="flex items-center space-x-3">
+                                        <a href='/inventories' className="flex items-center space-x-3">
                                         <Package
                                             size={20}
                                             style={{ color: '#E213A7' }}
@@ -337,6 +283,7 @@ export default function DashboardPage() {
                                         <span className="text-gray-800 font-medium">
                                             Manage Inventory
                                         </span>
+                                        </a>
                                     </div>
                                 </button>
                             </div>
