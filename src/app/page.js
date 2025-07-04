@@ -15,6 +15,7 @@ import {
     Building2,
     ShoppingBag
 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
 
 // Mock data for dashboard
 const mockStats = [
@@ -43,6 +44,10 @@ const mockNotifications = [
 export default function DashboardPage() {
     const [viewMode, setViewMode] = useState('grid');
     const [recentProducts, setRecentProducts] = useState([]);
+    const [analytics, setAnalytics] = useState(null);
+    const [salesTrends, setSalesTrends] = useState(null);
+    const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+    const [loadingTrends, setLoadingTrends] = useState(true);
 
     useEffect(() => {
         const fetchRecentProducts = async () => {
@@ -63,6 +68,33 @@ export default function DashboardPage() {
         fetchRecentProducts();
     }, []);
 
+    useEffect(() => {
+        const fetchAnalytics = async () => {
+            setLoadingAnalytics(true);
+            try {
+                const response = await api.get('/analytics/dashboard/overview');
+                setAnalytics(response.data);
+            } catch (error) {
+                setAnalytics(null);
+            } finally {
+                setLoadingAnalytics(false);
+            }
+        };
+        const fetchTrends = async () => {
+            setLoadingTrends(true);
+            try {
+                const response = await api.get('/analytics/dashboard/sales-trends');
+                setSalesTrends(response.data);
+            } catch (error) {
+                setSalesTrends(null);
+            } finally {
+                setLoadingTrends(false);
+            }
+        };
+        fetchAnalytics();
+        fetchTrends();
+    }, []);
+
     const dashboardActions = (
         <>
             <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
@@ -80,40 +112,85 @@ export default function DashboardPage() {
             <div className="max-w-7xl mx-auto">
                 {/* Stats cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-                    {mockStats.map((stat, index) => (
-                        <div
-                            key={index}
-                            className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">
-                                        {stat.label}
-                                    </p>
-                                    <p className="text-2xl font-bold text-gray-800">
-                                        {stat.value}
-                                    </p>
+                    {loadingAnalytics || !analytics ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 animate-pulse h-32" />
+                        ))
+                    ) : (
+                        <>
+                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-600">Revenue (Today)</p>
+                                        <p className="text-2xl font-bold text-gray-800">${analytics.total_revenue_today}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg" style={{ backgroundColor: '#FFE3EC' }}>
+                                        <TrendingUp size={24} style={{ color: '#E213A7' }} />
+                                    </div>
                                 </div>
-                                <div
-                                    className="p-3 rounded-lg"
-                                    style={{ backgroundColor: '#FFE3EC' }}
-                                >
-                                    <stat.icon
-                                        size={24}
-                                        style={{ color: '#E213A7' }}
-                                    />
+                                <div className="mt-4 text-xs text-gray-500">This is your revenue for today.</div>
+                            </div>
+                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-600">Orders (This Month)</p>
+                                        <p className="text-2xl font-bold text-gray-800">{analytics.total_orders_month}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg" style={{ backgroundColor: '#FFE3EC' }}>
+                                        <ShoppingBag size={24} style={{ color: '#E213A7' }} />
+                                    </div>
                                 </div>
+                                <div className="mt-4 text-xs text-gray-500">Orders placed this month.</div>
                             </div>
-                            <div className="mt-4">
-                                <span className="text-green-600 text-sm font-medium">
-                                    {stat.change}
-                                </span>
-                                <span className="text-gray-600 text-sm ml-1">
-                                    from last month
-                                </span>
+                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-600">Customers</p>
+                                        <p className="text-2xl font-bold text-gray-800">{analytics.total_customers}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg" style={{ backgroundColor: '#FFE3EC' }}>
+                                        <Heart size={24} style={{ color: '#E213A7' }} />
+                                    </div>
+                                </div>
+                                <div className="mt-4 text-xs text-gray-500">Total registered customers.</div>
                             </div>
-                        </div>
-                    ))}
+                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-600">Inventory Value</p>
+                                        <p className="text-2xl font-bold text-gray-800">${analytics.inventory_value}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg" style={{ backgroundColor: '#FFE3EC' }}>
+                                        <Package size={24} style={{ color: '#E213A7' }} />
+                                    </div>
+                                </div>
+                                <div className="mt-4 text-xs text-gray-500">Total value of inventory.</div>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Sales Trends Graph */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8 p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Sales Trends</h3>
+                    {loadingTrends || !salesTrends ? (
+                        <div className="h-48 flex items-center justify-center text-gray-400">Loading chart...</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={salesTrends.daily_sales.map(s => ({
+                                ...s,
+                                date: new Date(s.date).toLocaleDateString()
+                            }))} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Line type="monotone" dataKey="revenue" stroke="#E213A7" name="Revenue" />
+                                <Line type="monotone" dataKey="orders" stroke="#8884d8" name="Orders" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
 
                 {/* Main content grid */}
