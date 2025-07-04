@@ -4,18 +4,15 @@ import { useState, useEffect } from 'react';
 import {
     Search,
     Bell,
-    Heart,
     ShoppingBag,
     User,
     Settings,
     Package,
     Users,
-    Plus,
     Menu,
     X,
     Home,
     Tag,
-    MessageSquare,
     BarChart3,
     Building2,
     Warehouse
@@ -295,10 +292,10 @@ export default function DashboardLayout({
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-800 truncate">
-                                    {user.firstName} {user.lastName}
+                                    {user.first_name} {user.last_name}
                                 </p>
                                 <p className="text-sm text-gray-600 truncate">
-                                    @{user.username}
+                                    @{user.email}
                                 </p>
                             </div>
                         </div>

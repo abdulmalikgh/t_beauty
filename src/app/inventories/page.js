@@ -233,8 +233,18 @@ export default function InventoryPage() {
         e.preventDefault();
         setIsSubmitting(true);
         try {
+            // Prevent duplicate inventory for a product
+            if (modalMode === 'add') {
+                const duplicate = inventory.find(item => String(item.product_id) === String(formData.product_id));
+                if (duplicate) {
+                    setError('You cannot create inventory for a product that already has inventory.');
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+           
             const itemData = {
-                product_id: Number.parseInt(formData.product_id) || 1,
+                product_id: Number.parseInt(formData.product_id) ,
                 location: formData.location,
                 current_stock: Number.parseInt(formData.current_stock) || 0,
                 cost_price: Number.parseFloat(formData.cost_price) || 0,
@@ -273,7 +283,7 @@ export default function InventoryPage() {
 
         setIsSubmitting(true);
         try {
-            await inventoryAPI.deleteInventoryItem(itemToDelete.sku);
+            await inventoryAPI.deleteInventoryItem(itemToDelete.id);
             setShowDeleteModal(false);
             setItemToDelete(null);
             fetchInventory();
@@ -810,10 +820,7 @@ export default function InventoryPage() {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm font-medium text-gray-900 flex items-center">
-                                                            <DollarSign
-                                                                size={12}
-                                                                className="mr-1"
-                                                            />
+                                                           
                                                             {formatPrice(
                                                                 item.selling_price
                                                             )}
